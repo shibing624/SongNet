@@ -1,3 +1,5 @@
+import os
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -132,6 +134,7 @@ batch_size = 1
 cp_size = 1
 batches = round(len(ds) / batch_size)
 
+os.makedirs('./results', exist_ok=True)
 for i in range(5):
     fo = open("./results/out"+str(i+1)+".txt", "w")     
     idx = 0

@@ -5,31 +5,34 @@ import numpy as np
 PAD, UNK, BOS, EOS = '<pad>', '<unk>', '<bos>', '<eos>'
 BOC, EOC = '<boc>', '<eoc>'
 LS, RS, SP = '<s>', '</s>', ' '
-CS = ['<c-1>'] + ['<c' + str(i) + '>' for i in range(32)] # content
-SS = ['<s-1>'] + ['<s' + str(i) + '>' for i in range(512)] # segment
-PS = ['<p-1>'] + ['<p' + str(i) + '>' for i in range(512)] # position
-TS = ['<t-1>'] + ['<t' + str(i) + '>' for i in range(32)] # other types
+CS = ['<c-1>'] + ['<c' + str(i) + '>' for i in range(32)]  # content
+SS = ['<s-1>'] + ['<s' + str(i) + '>' for i in range(512)]  # segment
+PS = ['<p-1>'] + ['<p' + str(i) + '>' for i in range(512)]  # position
+TS = ['<t-1>'] + ['<t' + str(i) + '>' for i in range(32)]  # other types
 
 PUNCS = set([",", ".", "?", "!", ":", "，", "。", "？", "！", "："])
 
 BUFSIZE = 4096000
+
 
 def ListsToTensor(xs, vocab=None):
     max_len = max(len(x) for x in xs)
     ys = []
     for x in xs:
         if vocab is not None:
-            y = vocab.token2idx(x) + [vocab.padding_idx]*(max_len - len(x))
+            y = vocab.token2idx(x) + [vocab.padding_idx] * (max_len - len(x))
         else:
-            y = x + [0]*(max_len - len(x))
+            y = x + [0] * (max_len - len(x))
         ys.append(y)
     return ys
+
 
 def _back_to_text_for_check(x, vocab):
     w = x.t().tolist()
     for sent in vocab.idx2token(w):
-        print (' '.join(sent))
-    
+        print(' '.join(sent))
+
+
 def batchify(data, vocab):
     xs_tpl, xs_seg, xs_pos, \
     ys_truth, ys_inp, \
@@ -38,13 +41,13 @@ def batchify(data, vocab):
         xs_tpl.append(xs_tpl_i)
         xs_seg.append(xs_seg_i)
         xs_pos.append(xs_pos_i)
-        
+
         ys_truth.append(ys_i)
         ys_inp.append([BOS] + ys_i[:-1])
         ys_tpl.append(ys_tpl_i)
         ys_seg.append(ys_seg_i)
         ys_pos.append(ys_pos_i)
-        
+
         msk.append([1 for i in range(len(ys_i))])
 
     xs_tpl = torch.LongTensor(ListsToTensor(xs_tpl, vocab)).t_().contiguous()
@@ -58,6 +61,7 @@ def batchify(data, vocab):
     msk = torch.FloatTensor(ListsToTensor(msk)).t_().contiguous()
     return xs_tpl, xs_seg, xs_pos, ys_truth, ys_inp, ys_tpl, ys_seg, ys_pos, msk
 
+
 def s2t(strs, vocab):
     inp, msk = [], []
     for x in strs:
@@ -68,6 +72,7 @@ def s2t(strs, vocab):
     msk = torch.FloatTensor(ListsToTensor(msk)).t_().contiguous()
     return inp, msk
 
+
 def s2xy(lines, vocab, max_len, min_len):
     data = []
     for line in lines:
@@ -75,7 +80,8 @@ def s2xy(lines, vocab, max_len, min_len):
         if not res:
             continue
         data.append(res)
-    return  batchify(data, vocab)
+    return batchify(data, vocab)
+
 
 def parse_line(line, max_len, min_len):
     line = line.strip()
@@ -99,7 +105,7 @@ def parse_line(line, max_len, min_len):
     ws = [w for w in ctx]
     xs_tpl = ws + [EOC]
     xs_seg = [SS[0] for w in ws] + [EOC]
-    xs_pos = [SS[i+300] for i in range(len(ws))] + [EOC]
+    xs_pos = [SS[i + 300] for i in range(len(ws))] + [EOC]
 
     ys_tpl = []
     ys_seg = []
@@ -132,17 +138,19 @@ def parse_line(line, max_len, min_len):
     xs_tpl += ys_tpl
     xs_seg += ys_seg
     xs_pos += ys_pos
-    
+
     if len(ys) < min_len:
         return None
     return xs_tpl, xs_seg, xs_pos, ys, ys_tpl, ys_seg, ys_pos
+
 
 def s2xy_polish(lines, vocab, max_len, min_len):
     data = []
     for line in lines:
         res = parse_line_polish(line, max_len, min_len)
         data.append(res)
-    return  batchify(data, vocab)
+    return batchify(data, vocab)
+
 
 def parse_line_polish(line, max_len, min_len):
     line = line.strip()
@@ -166,7 +174,7 @@ def parse_line_polish(line, max_len, min_len):
     ws = [w for w in ctx]
     xs_tpl = ws + [EOC]
     xs_seg = [SS[0] for w in ws] + [EOC]
-    xs_pos = [SS[i+300] for i in range(len(ws))] + [EOC]
+    xs_pos = [SS[i + 300] for i in range(len(ws))] + [EOC]
 
     ys_tpl = []
     ys_seg = []
@@ -195,11 +203,12 @@ def parse_line_polish(line, max_len, min_len):
     xs_tpl += ys_tpl
     xs_seg += ys_seg
     xs_pos += ys_pos
-    
+
     if len(ys) < min_len:
         return None
 
     return xs_tpl, xs_seg, xs_pos, ys, ys_tpl, ys_seg, ys_pos
+
 
 class DataLoader(object):
     def __init__(self, vocab, filename, batch_size, max_len_y, min_len_y):
@@ -212,7 +221,7 @@ class DataLoader(object):
         self.epoch_id = 0
 
     def __iter__(self):
-        
+
         lines = self.stream.readlines(BUFSIZE)
 
         if not lines:
@@ -222,25 +231,26 @@ class DataLoader(object):
             lines = self.stream.readlines(BUFSIZE)
 
         data = []
-        for line in lines[:-1]: # the last sent may be imcomplete
+        for line in lines[:-1]:  # the last sent may be imcomplete
             res = parse_line(line, self.max_len_y, self.min_len_y)
             if not res:
                 continue
             data.append(res)
-        
+
         random.shuffle(data)
-        
+
         idx = 0
         while idx < len(data):
-            yield batchify(data[idx:idx+self.batch_size], self.vocab)
+            yield batchify(data[idx:idx + self.batch_size], self.vocab)
             idx += self.batch_size
 
+
 class Vocab(object):
-    def __init__(self, filename, min_occur_cnt, specials = None):
+    def __init__(self, filename, min_occur_cnt, specials=None):
         idx2token = [PAD, UNK, BOS, EOS] + [BOC, EOC, LS, RS, SP] + CS + SS + PS + TS \
-                    +  (specials if specials is not None else [])
+                    + (specials if specials is not None else [])
         for line in open(filename, encoding='utf8').readlines():
-            try: 
+            try:
                 token, cnt = line.strip().split()
             except:
                 continue
@@ -254,17 +264,17 @@ class Vocab(object):
     @property
     def size(self):
         return len(self._idx2token)
-    
+
     @property
     def unk_idx(self):
         return self._unk_idx
-    
+
     @property
     def padding_idx(self):
         return self._padding_idx
-    
+
     def random_token(self):
-        return self.idx2token(1 + np.random.randint(self.size-1))
+        return self.idx2token(1 + np.random.randint(self.size - 1))
 
     def idx2token(self, x):
         if isinstance(x, list):

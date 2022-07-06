@@ -5,6 +5,7 @@ import random
 import numpy as np
 import copy 
 import time
+import os
 
 from biglm import BIGLM
 from data import Vocab, DataLoader, s2t, s2xy
@@ -308,6 +309,7 @@ batch_size = 1
 cp_size = 1
 batches = round(len(ds) / batch_size)
 
+os.makedirs('./results', exist_ok=True)
 for i in range(5): 
     idx = 0
     fo = open("./results/top-"+str(k)+"/out"+str(i+1)+".txt", "w")
