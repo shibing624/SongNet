@@ -324,7 +324,7 @@ cp_size = 1
 batches = round(len(ds) / batch_size)
 
 os.makedirs(f'./results/top-{k}/', exist_ok=True)
-for i in range(5):
+for i in range(2):
     idx = 0
     with open("./results/top-" + str(k) + "/out" + str(i + 1) + ".txt", "w") as fo:
         while idx < len(ds):

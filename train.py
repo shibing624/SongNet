@@ -1,16 +1,15 @@
 # coding=utf-8
 import torch
 import torch.distributed as dist
-import torch.nn as nn
-import torch.nn.functional as F
+from loguru import logger
 import torch.multiprocessing as mp
 
 from biglm import BIGLM
 from data import Vocab, DataLoader, s2xy
 from optim import Optim
 
-import argparse, os
-import random
+import argparse
+import os
 
 
 def parse_config():
@@ -107,18 +106,34 @@ def eval_epoch(lm_args, model, lm_vocab, local_rank, label):
     print(label, "nll=", avg_nll / count, "ppl=", avg_ppl / count, "count=", count, flush=True)
 
 
+def init_model(m_path, device, vocab):
+    ckpt = torch.load(m_path, map_location='cpu')
+    lm_args = ckpt['args']
+    lm_vocab = Vocab(vocab, min_occur_cnt=lm_args.min_occur_cnt, specials=[])
+    lm_model = BIGLM(device, lm_vocab, lm_args.embed_dim, lm_args.ff_embed_dim, lm_args.num_heads, lm_args.dropout,
+                     lm_args.layers, 0.1)
+    lm_model.load_state_dict(ckpt['model'])
+    lm_model = lm_model.cuda(device)
+    lm_model.eval()
+    return lm_model, lm_vocab, lm_args, ckpt
+
+
 def run(args, local_rank):
     """ Distributed Synchronous """
     torch.manual_seed(1234)
-    vocab = Vocab(args.vocab, min_occur_cnt=args.min_occur_cnt, specials=[])
-    if args.world_size == 1 or dist.get_rank() == 0:
-        print("vocab.size = " + str(vocab.size), flush=True)
-    model = BIGLM(local_rank, vocab, args.embed_dim, args.ff_embed_dim,
-                  args.num_heads, args.dropout, args.layers, args.smoothing)
+    logger.info(args)
+
+    ckpt = None
     if args.start_from is not None:
-        ckpt = torch.load(args.start_from, map_location='cpu')
-        model.load_state_dict(ckpt['model'])
+        model, vocab, lm_args, ckpt = init_model(args.start_from, local_rank, args.vocab)
+    else:
+        vocab = Vocab(args.vocab, min_occur_cnt=args.min_occur_cnt, specials=[])
+        model = BIGLM(local_rank, vocab, args.embed_dim, args.ff_embed_dim,
+                      args.num_heads, args.dropout, args.layers, args.smoothing)
     model = model.cuda(local_rank)
+    if args.world_size == 1 or dist.get_rank() == 0:
+        logger.info(f"vocab.size = {vocab.size}")
+        logger.info(f'model: {model}')
 
     optimizer = Optim(model.embed_dim, args.lr, args.warmup_steps,
                       torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.998), eps=1e-9))
