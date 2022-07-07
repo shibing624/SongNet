@@ -5,7 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 import random
 import numpy as np
-import copy 
+import sys
 import time
 
 from biglm import BIGLM
@@ -22,7 +22,7 @@ def init_model(m_path, device, vocab):
     lm_model.eval()
     return lm_model, lm_vocab, lm_args
 
-m_path = "./model/songci.ckpt"
+m_path = sys.argv[1] if len(sys.argv) > 1 else "./model/songci.ckpt"
 lm_model, lm_vocab, lm_args = init_model(m_path, gpu, "./model/vocab.txt")
 
 
