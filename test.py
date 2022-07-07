@@ -23,6 +23,7 @@ def init_seeds():
 
 gpu = 0
 
+
 def init_model(m_path, device, vocab):
     ckpt = torch.load(m_path, map_location='cpu')
     lm_args = ckpt['args']
@@ -36,6 +37,7 @@ def init_model(m_path, device, vocab):
 
 
 m_path = sys.argv[1] if len(sys.argv) > 1 else "./model/songci.ckpt"
+limit_size = int(sys.argv[2]) if len(sys.argv) > 2 else None
 lm_model, lm_vocab, lm_args = init_model(m_path, gpu, "./model/vocab.txt")
 
 k = 32
@@ -313,6 +315,9 @@ with open("./data/test.txt", "r") as f:
             ds.append(line)
 print(len(ds))
 
+print('limit_size', limit_size)
+ds = ds[:limit_size] if limit_size else ds
+
 local_rank = gpu
 batch_size = 1
 cp_size = 1
@@ -321,35 +326,33 @@ batches = round(len(ds) / batch_size)
 os.makedirs(f'./results/top-{k}/', exist_ok=True)
 for i in range(5):
     idx = 0
-    fo = open("./results/top-" + str(k) + "/out" + str(i + 1) + ".txt", "w")
-    while idx < len(ds):
-        lb = ds[idx:idx + batch_size]
-        cplb = []
-        for line in lb:
-            cplb += [line for i in range(cp_size)]
-        print(cplb)
-        xs_tpl, xs_seg, xs_pos, \
-        ys_truth, ys_inp, \
-        ys_tpl, ys_seg, ys_pos, msk = s2xy(cplb, lm_vocab, lm_args.max_len, 2)
+    with open("./results/top-" + str(k) + "/out" + str(i + 1) + ".txt", "w") as fo:
+        while idx < len(ds):
+            lb = ds[idx:idx + batch_size]
+            cplb = []
+            for line in lb:
+                cplb += [line for i in range(cp_size)]
+            print(cplb)
+            xs_tpl, xs_seg, xs_pos, \
+            ys_truth, ys_inp, \
+            ys_tpl, ys_seg, ys_pos, msk = s2xy(cplb, lm_vocab, lm_args.max_len, 2)
 
-        xs_tpl = xs_tpl.cuda(local_rank)
-        xs_seg = xs_seg.cuda(local_rank)
-        xs_pos = xs_pos.cuda(local_rank)
-        ys_tpl = ys_tpl.cuda(local_rank)
-        ys_seg = ys_seg.cuda(local_rank)
-        ys_pos = ys_pos.cuda(local_rank)
+            xs_tpl = xs_tpl.cuda(local_rank)
+            xs_seg = xs_seg.cuda(local_rank)
+            xs_pos = xs_pos.cuda(local_rank)
+            ys_tpl = ys_tpl.cuda(local_rank)
+            ys_seg = ys_seg.cuda(local_rank)
+            ys_pos = ys_pos.cuda(local_rank)
 
-        enc, src_padding_mask = lm_model.encode(xs_tpl, xs_seg, xs_pos)
-        s = [['<bos>']] * batch_size * cp_size
-        res = top_k_inc(enc, src_padding_mask, ys_tpl, ys_seg, ys_pos, s)
+            enc, src_padding_mask = lm_model.encode(xs_tpl, xs_seg, xs_pos)
+            s = [['<bos>']] * batch_size * cp_size
+            res = top_k_inc(enc, src_padding_mask, ys_tpl, ys_seg, ys_pos, s)
 
-        for i, line in enumerate(cplb):
-            r = ''.join(res[i])
-            print(line)
-            print(r)
+            for i, line in enumerate(cplb):
+                r = ''.join(res[i])
+                print(line)
+                print(r)
+                print('-' * 42)
+                fo.write(line + "\t" + r + "\n")
 
-            fo.write(line + "\t" + r + "\n")
-
-        idx += batch_size
-
-    fo.close()
+            idx += batch_size
