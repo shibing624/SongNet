@@ -21,8 +21,7 @@ def init_seeds():
 
 # init_seeds()
 
-gpu = 1
-
+gpu = 0
 
 def init_model(m_path, device, vocab):
     ckpt = torch.load(m_path, map_location='cpu')
@@ -319,7 +318,7 @@ batch_size = 1
 cp_size = 1
 batches = round(len(ds) / batch_size)
 
-os.makedirs('./results', exist_ok=True)
+os.makedirs(f'./results/top-{k}/', exist_ok=True)
 for i in range(5):
     idx = 0
     fo = open("./results/top-" + str(k) + "/out" + str(i + 1) + ".txt", "w")
